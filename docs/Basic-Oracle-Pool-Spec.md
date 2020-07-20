@@ -81,8 +81,9 @@ The oracle pool box at this stage must also hold the pool's NFT/singleton token.
 - Live epoch duration
 - Epoch preparation duration
 - Margin of error(%) that oracles are allowed to be off by.
-- The price for each oracle pool datapoint posting
 - The oracle pool NFT/singleton token id
+- Collector reward
+- Oracle posting price
 
 
 ### Actions/Spending Paths
@@ -113,8 +114,10 @@ The oracle pool box at this stage must also hold the pool's NFT/singleton token.
 - Addresses of all trusted oracles (this is used for an extra safety measure to prevent others who aren't oracles from collecting)
 - Live epoch duration
 - Epoch preparation duration
-- The price for each oracle pool datapoint posting
 - The oracle pool NFT/singleton token id
+- Collector reward
+- Oracle posting price
+
 
 
 ### Actions/Spending Paths
@@ -255,10 +258,11 @@ This is the function which produces the finalized datapoint by folding down the 
 ```
 Using a more complex equation and/or filtering major outliers before averaging is a good idea and will be implemented in the future.
 
-###### Successful Oracle Epoch Payout Function
-This is the amount of Ergs which a successful oracle (one that has provided a datapoint within the margin of error) is awarded at the end of an epoch. The plus one is to pay out the collector an extra portion for performing the collection.
+###### Collector Payout Function
+This is the amount of Ergs which a collector is rewarded when they perform their job. The more oracles that they collect, the higher their reward is. This thereby monetarily incentivizes proper action by the collector. The collector reward is hardcoded into the contracts.
+
 ```haskell
-[Oracle Pool Posting Price] / ([Num Successful Oracles] + 1)
+[Num Successful Oracles] * [Collector Reward]
 ```
 
 ### Data-Inputs
@@ -271,10 +275,13 @@ This is the amount of Ergs which a successful oracle (one that has provided a da
 #### Output #1
 The [Epoch Preparation](<#Stage-Epoch-Preparation>) box with the new datapoint
 
-#### Output #2+
-Payment boxes which are holding Ergs that are sent to each oracle who successfully provided a datapoint within the margin of error, plus an extra payment box to the collector (meaning the collector can get 1 or 2 payment boxes depending if they provide accurate data).
+#### Output #2
+A collector payment box which holds Ergs equal to the result of the `Collector Payout Function`.
 
-The equation for the amount of Ergs inside each payment box can be found in *Successful Oracle Epoch Payout Function* in the preamble.
+#### Output #3+
+Payment boxes which are holding Ergs that are sent to each oracle who successfully provided a datapoint within the margin of error.
+
+The amount of Ergs is based off of the `Oracle Post Price` which is hardcoded into the contracts.
 
 ### Action Conditions
 1. Collecting datapoints can only be performed by one of the hard-coded oracles.
@@ -283,11 +290,12 @@ The equation for the amount of Ergs inside each payment box can be found in *Suc
 4. Output #1 R4 is the result of the `Finalize Datapoint Function`
 5. Output #1 R5 is equal to: `[Input #1 R5] + [Hardcoded Epoch Length]`
 6. A payment box output is generated for all of the successful oracles who provided a datapoint within the hardcoded margin of error (compared to finalized datapoint in R4 of Output #1). The addresses are acquired from the data-input [Datapoint](<#Stage-Datapoint>) box's R4.
-7. Each payment box has a total amount of Ergs inside equal to the result of the `Successful Oracle Epoch Payout Function`.
+7. Each payment box has a total amount of Ergs inside equal to the `Oracle Post Price`.
 8. Each data-input [Datapoint](<#Stage-Datapoint>) box has an R5 that is equal to Input #1 box id.
 9. At least 1 valid data-input box is provided.
 10. Output #1 address is equal to the address held in R6 of Input #1.
 11. Every data-input [Datapoint](<#Stage-Datapoint>) box has a datapoint within the margin of error.
+12. Output #2 goes to the collector and holds an equivalent amount of Ergs as dictated by the `Collector Payout Function`.
 ---
 
 
