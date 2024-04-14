@@ -7,6 +7,7 @@ use super::assets_exchange_rate::Btc;
 use super::assets_exchange_rate::Usd;
 use super::erg_xau::KgAu;
 
+#[cfg(not(test))]
 pub async fn get_kgau_nanoerg() -> Result<AssetsExchangeRate<KgAu, NanoErg>, DataPointSourceError> {
     let url = "https://api.coingecko.com/api/v3/simple/price?ids=ergo&vs_currencies=XAU";
     let resp = reqwest::get(url).await?;
@@ -27,6 +28,18 @@ pub async fn get_kgau_nanoerg() -> Result<AssetsExchangeRate<KgAu, NanoErg>, Dat
             json: price_json.dump(),
         })
     }
+}
+
+#[cfg(test)]
+pub async fn get_kgau_nanoerg() -> Result<AssetsExchangeRate<KgAu, NanoErg>, DataPointSourceError> {
+    let nanoerg_per_troy_ounce = NanoErg::from_erg(1.0 / 0.0008162);
+    let nanoerg_per_kg = KgAu::from_troy_ounce(nanoerg_per_troy_ounce);
+    let rate = AssetsExchangeRate {
+        per1: KgAu {},
+        get: NanoErg {},
+        rate: nanoerg_per_kg,
+    };
+    Ok(rate)
 }
 
 #[cfg(not(test))]
