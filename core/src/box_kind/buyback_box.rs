@@ -1,7 +1,9 @@
 use std::vec;
 
+use crate::oracle_types::BlockHeight;
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBoxCandidate;
+use ergo_lib::ergotree_ir::chain::token::Token;
 use thiserror::Error;
 
 use crate::spec_token::RewardTokenId;
@@ -42,24 +44,32 @@ impl BuybackBoxWrapper {
             })
     }
 
-    pub fn new_without_reward_token(&self) -> ErgoBoxCandidate {
-        // take only buyback nft
-        let tokens = vec![self
-            .ergo_box
-            .tokens
-            .as_ref()
-            .unwrap()
-            .get(0)
-            .unwrap()
-            .clone()]
+    pub fn new_with_one_reward_token(&self, creation_height: BlockHeight) -> ErgoBoxCandidate {
+        let single_reward_token = Token {
+            token_id: self.reward_token_id.token_id(),
+            amount: 1.try_into().unwrap(),
+        };
+
+        // take buyback nft and at least one reward token
+        let tokens = vec![
+            self.ergo_box
+                .tokens
+                .as_ref()
+                .unwrap()
+                .get(0)
+                .unwrap()
+                .clone(),
+            single_reward_token,
+        ]
         .try_into()
         .unwrap();
+
         ErgoBoxCandidate {
             value: self.ergo_box.value,
             ergo_tree: self.ergo_box.ergo_tree.clone(),
             tokens: Some(tokens),
             additional_registers: self.ergo_box.additional_registers.clone(),
-            creation_height: self.ergo_box.creation_height,
+            creation_height: creation_height.0,
         }
     }
 }

@@ -160,9 +160,13 @@ pub fn build_refresh_action(
                 height,
                 rate,
                 reward_decrement,
-                Some(buyback_reward_token.amount),
+                Some(
+                    (buyback_reward_token.amount.as_u64() - 1)
+                        .try_into()
+                        .unwrap(),
+                ),
             )?;
-            let out_buyback_box = buyback_box.new_without_reward_token();
+            let out_buyback_box = buyback_box.new_with_one_reward_token(height);
             output_candidates.remove(0);
             output_candidates.insert(0, out_pool_box_w_buyback_rewards);
             // should be at index 2 (checked in the contract of the buyback input box)
@@ -694,8 +698,8 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .len(),
-            1,
-            "only one token should be in output buyback box"
+            2,
+            "only two tokens should be in output buyback box"
         );
         assert_eq!(
             action_with_buyback
@@ -710,8 +714,25 @@ mod tests {
                 .unwrap()
                 .token_id,
             buyback_token_id,
-            "only buyback nft should be in output buyback box"
+            "buyback nft should be in output buyback box"
         );
+        assert_eq!(
+            action_with_buyback
+                .tx
+                .output_candidates
+                .get(2)
+                .unwrap()
+                .tokens
+                .as_ref()
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .amount
+                .as_u64(),
+            &1,
+            "one reward token should be in output buyback box"
+        );
+
         assert_eq!(
             action_with_buyback
                 .tx
@@ -725,7 +746,7 @@ mod tests {
                 .unwrap()
                 .amount
                 .as_u64(),
-            &190,
+            &189,
             "reward tokens should be added to the pool box"
         )
     }
