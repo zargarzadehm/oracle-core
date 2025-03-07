@@ -3,10 +3,8 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::option::Option;
 
-use ergo_lib::chain::ergo_state_context::ErgoStateContext;
 use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
 use ergo_lib::chain::transaction::TxId;
-// use ergo_lib::chain::transaction::TxIoVec;
 use ergo_lib::ergo_chain_types::Digest32;
 use ergo_lib::ergo_chain_types::EcPoint;
 use ergo_lib::ergotree_ir::chain::ergo_box::box_value::BoxValue;
@@ -19,9 +17,6 @@ use ergo_lib::ergotree_ir::ergo_tree::ErgoTree;
 use ergo_lib::ergotree_ir::mir::constant::Constant;
 use ergo_lib::ergotree_ir::mir::expr::Expr;
 use ergo_lib::ergotree_ir::sigma_protocol::sigma_boolean::ProveDlog;
-// use ergo_lib::wallet::signing::TransactionContext;
-use ergo_lib::wallet::Wallet;
-// use ergo_node_interface::node_interface::NodeError;
 use sigma_test_util::force_any_val;
 
 use crate::box_kind::BallotBoxWrapper;
@@ -266,11 +261,6 @@ pub(crate) fn find_input_boxes(
         })
         .as_vec()
         .clone()
-}
-
-pub struct LocalTxSigner<'a> {
-    pub ctx: &'a ErgoStateContext,
-    pub wallet: &'a Wallet,
 }
 
 pub fn init_log_tests() {

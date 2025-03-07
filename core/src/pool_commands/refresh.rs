@@ -395,13 +395,12 @@ mod tests {
     use crate::box_kind::PostedOracleBox;
     use crate::box_kind::RefreshBoxWrapper;
     use crate::box_kind::RefreshBoxWrapperInputs;
-    use crate::cli_commands::bootstrap::tests::SubmitTxMock;
     use crate::contracts::oracle::OracleContractParameters;
     use crate::contracts::pool::PoolContractParameters;
     use crate::contracts::refresh::RefreshContract;
     use crate::contracts::refresh::RefreshContractInputs;
     use crate::contracts::refresh::RefreshContractParameters;
-    use crate::node_interface::test_utils::MockNodeApi;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use crate::oracle_config::BASE_FEE;
     use crate::oracle_state::DataSourceError;
     use crate::oracle_types::EpochLength;

@@ -677,12 +677,7 @@ pub(crate) mod tests {
     use sigma_test_util::force_any_val;
 
     use super::*;
-    use crate::node_interface::test_utils::MockNodeApi;
-    use std::cell::RefCell;
-    #[derive(Default)]
-    pub(crate) struct SubmitTxMock {
-        pub(crate) transactions: RefCell<Vec<Transaction>>,
-    }
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[test]
     fn test_bootstrap() {

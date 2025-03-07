@@ -219,8 +219,7 @@ mod tests {
     use ergo_lib::ergotree_interpreter::sigma_protocol::private_input::DlogProverInput;
     use ergo_lib::ergotree_ir::chain::address::AddressEncoder;
     use sigma_test_util::force_any_val;
-    use crate::cli_commands::bootstrap::tests::SubmitTxMock;
-    use crate::node_interface::test_utils::MockNodeApi;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[test]
     fn test_extract_reward_tokens() {

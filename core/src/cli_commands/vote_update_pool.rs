@@ -304,9 +304,8 @@ mod tests {
         },
         spec_token::{RewardTokenId, SpecToken, TokenIdKind},
     };
-    use crate::cli_commands::bootstrap::tests::SubmitTxMock;
     use crate::node_interface::node_api::NodeApiTrait;
-    use crate::node_interface::test_utils::MockNodeApi;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use super::{build_tx_for_first_ballot_box, build_tx_with_existing_ballot_box};
 
     #[test]

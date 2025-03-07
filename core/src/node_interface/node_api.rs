@@ -10,9 +10,7 @@ use ergo_lib::wallet::signing::TransactionContext;
 use ergo_lib::wallet::{Wallet, WalletError};
 use ergo_node_interface::scanning::NodeError;
 use ergo_node_interface::{NodeInterface, P2PKAddressString};
-// use log::info;
 use reqwest::Url;
-// use serde_json::json;
 use thiserror::Error;
 use crate::oracle_config::ORACLE_SECRETS;
 

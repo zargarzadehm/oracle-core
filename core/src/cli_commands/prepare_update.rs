@@ -568,13 +568,8 @@ mod test {
         wallet::Wallet,
     };
     use sigma_test_util::force_any_val;
-    use url::Url;
     use super::*;
-    use crate::{
-        cli_commands::bootstrap::tests::SubmitTxMock,
-        pool_commands::test_utils::LocalTxSigner,
-    };
-    use crate::node_interface::test_utils::MockNodeApi;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[test]
     fn test_prepare_update_transaction() {

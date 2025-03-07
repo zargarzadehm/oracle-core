@@ -206,8 +206,7 @@ mod tests {
     use ergo_lib::ergotree_ir::mir::constant::Constant;
     use ergo_lib::ergotree_ir::mir::expr::Expr;
     use sigma_test_util::force_any_val;
-    use crate::cli_commands::bootstrap::tests::SubmitTxMock;
-    use crate::node_interface::test_utils::MockNodeApi;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[derive(Debug)]
     struct MockDatapointSource {

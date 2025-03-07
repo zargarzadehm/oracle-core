@@ -198,10 +198,8 @@ mod tests {
     use ergo_lib::chain::ergo_state_context::ErgoStateContext;
     use ergo_lib::ergotree_interpreter::sigma_protocol::private_input::DlogProverInput;
     use ergo_lib::ergotree_ir::chain::address::AddressEncoder;
-    use ergo_lib::wallet::Wallet;
     use sigma_test_util::force_any_val;
-    use crate::cli_commands::bootstrap::tests::SubmitTxMock;
-    use crate::node_interface::test_utils::MockNodeApi;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[test]
     fn test_transfer_oracle_datapoint() {
@@ -209,7 +207,6 @@ mod tests {
         let height = BlockHeight(ctx.pre_header.height);
         let token_ids = generate_token_ids();
         let secret = force_any_val::<DlogProverInput>();
-        let wallet = Wallet::from_secrets(vec![secret.clone().into()]);
         let oracle_pub_key = secret.public_image().h;
 
         let parameters = OracleContractParameters::default();
@@ -257,6 +254,6 @@ mod tests {
         )
         .unwrap();
 
-        let _signed_tx = wallet.sign_transaction(context, &ctx, None).unwrap();
+        let _signed_tx = mock_node_api.sign_transaction(context).unwrap();
     }
 }

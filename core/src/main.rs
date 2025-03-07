@@ -365,7 +365,7 @@ fn main() {
                     error!("error: {:?}", e);
                 }
                 // Delay loop restart
-                thread::sleep(Duration::new(2, 0));
+                thread::sleep(Duration::new(30, 0));
             }
         }
         oracle_command => handle_pool_command(oracle_command, &node_api, network_prefix),

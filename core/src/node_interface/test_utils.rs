@@ -18,6 +18,11 @@ pub struct ChainSubmitTx<'a> {
     pub(crate) chain: RefCell<&'a mut ChainSim>,
 }
 
+#[derive(Default)]
+pub(crate) struct SubmitTxMock {
+    pub(crate) transactions: RefCell<Vec<Transaction>>,
+}
+
 pub struct MockNodeApi<'a> {
     pub unspent_boxes: Vec<ErgoBox>,
     pub secrets: Vec<SecretKey>,
@@ -26,7 +31,7 @@ pub struct MockNodeApi<'a> {
     pub ctx: ErgoStateContext,
 }
 
-impl NodeApiTrait for MockNodeApi<'_>{
+impl NodeApiTrait for MockNodeApi<'_> {
     fn get_unspent_boxes_by_address_with_token_filter_option(&self, _address: &P2PKAddressString, _target_balance: BoxValue, _target_tokens: Vec<Token>, _filter_boxes_token_ids: Vec<TokenId>) -> Result<Vec<ErgoBox>, BoxSelectorError> {
         Ok(self.unspent_boxes.clone())
     }
@@ -77,18 +82,3 @@ impl NodeApiTrait for MockNodeApi<'_>{
             .and_then(|tx| self.submit_transaction(&tx))
     }
 }
-
-// impl TransactionUtils for MockNodeApi{
-//
-//     fn sign_transaction(&self, _transaction_context: TransactionContext<UnsignedTransaction>) -> Result<Transaction, NodeApiError> {
-//         self.signed_tx.clone().ok_or(NodeApiError::NodeInterfaceError(
-//             NodeError::Other("No signed transaction provided".to_string()),
-//         ))
-//     }
-//
-//     fn submit_transaction(&self, _tx: &Transaction) -> Result<TxId, NodeApiError> {
-//         self.tx_id.clone().ok_or(NodeApiError::NodeInterfaceError(
-//             NodeError::Other("No transaction ID provided".to_string()),
-//         ))
-//     }
-// }
