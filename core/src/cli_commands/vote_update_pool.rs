@@ -1,9 +1,12 @@
 use std::convert::{TryFrom, TryInto};
 
+use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
+use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
+use ergo_lib::ergotree_ir::chain::token::Token;
+use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_lib::{
-    chain::{
-        ergo_box::box_builder::ErgoBoxCandidateBuilderError,
-    },
+    chain::ergo_box::box_builder::ErgoBoxCandidateBuilderError,
     ergo_chain_types::{Digest32, DigestNError, EcPoint},
     ergotree_interpreter::sigma_protocol::prover::ContextExtension,
     ergotree_ir::chain::address::Address,
@@ -12,13 +15,9 @@ use ergo_lib::{
         tx_builder::{TxBuilder, TxBuilderError},
     },
 };
-use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
-use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
-use ergo_lib::ergotree_ir::chain::token::Token;
-use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
-use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_node_interface::node_interface::NodeError;
 
+use crate::node_interface::node_api::NodeApiTrait;
 use crate::{
     box_kind::{make_local_ballot_box_candidate, BallotBox, BallotBoxWrapper},
     contracts::ballot::{
@@ -32,7 +31,6 @@ use crate::{
     spec_token::{RewardTokenId, SpecToken, TokenIdKind},
 };
 use thiserror::Error;
-use crate::node_interface::node_api::NodeApiTrait;
 
 #[derive(Debug, Error)]
 pub enum VoteUpdatePoolError {
@@ -178,7 +176,8 @@ fn build_tx_with_existing_ballot_box(
         in_ballot_box.get_box().value,
         height,
     )?;
-    let unspent_boxes = node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), *BASE_FEE, vec![])?;
+    let unspent_boxes =
+        node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), *BASE_FEE, vec![])?;
     let box_selector = SimpleBoxSelector::new();
     let selection = box_selector.select(unspent_boxes, *BASE_FEE, &[])?;
     let mut input_boxes = vec![in_ballot_box.get_box().clone()];
@@ -243,16 +242,12 @@ fn build_tx_for_first_ballot_box(
     let box_selector = SimpleBoxSelector::new();
     let selection_target_balance = out_ballot_box_value.checked_add(&BASE_FEE).unwrap();
     let target_tokens: Vec<Token> = vec![ballot_token.into()];
-    let unspent_boxes = node_api
-        .get_unspent_boxes_by_address(
-            &oracle_address.to_base58(),
-            selection_target_balance,
-            target_tokens.clone()
-        )?;
-    let selection = box_selector.select(
-        unspent_boxes,
+    let unspent_boxes = node_api.get_unspent_boxes_by_address(
+        &oracle_address.to_base58(),
         selection_target_balance,
-        &target_tokens)?;
+        target_tokens.clone(),
+    )?;
+    let selection = box_selector.select(unspent_boxes, selection_target_balance, &target_tokens)?;
     let box_selection = BoxSelection {
         boxes: selection.boxes.as_vec().clone().try_into().unwrap(),
         change_boxes: selection.change_boxes,
@@ -294,19 +289,17 @@ mod tests {
     };
     use sigma_test_util::force_any_val;
 
+    use super::{build_tx_for_first_ballot_box, build_tx_with_existing_ballot_box};
+    use crate::node_interface::node_api::NodeApiTrait;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use crate::{
         box_kind::{make_local_ballot_box_candidate, BallotBoxWrapper, BallotBoxWrapperInputs},
         contracts::ballot::{BallotContract, BallotContractInputs, BallotContractParameters},
         oracle_config::BASE_FEE,
         oracle_types::{BlockHeight, EpochLength},
-        pool_commands::test_utils::{
-            generate_token_ids, make_wallet_unspent_box,
-        },
+        pool_commands::test_utils::{generate_token_ids, make_wallet_unspent_box},
         spec_token::{RewardTokenId, SpecToken, TokenIdKind},
     };
-    use crate::node_interface::node_api::NodeApiTrait;
-    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
-    use super::{build_tx_for_first_ballot_box, build_tx_with_existing_ballot_box};
 
     #[test]
     fn test_vote_update_pool_no_existing_ballot_box() {
@@ -341,7 +334,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
 
         let new_reward_token = SpecToken {
@@ -349,8 +342,7 @@ mod tests {
             amount: 100_000.try_into().unwrap(),
         };
 
-        let ballot_token_owner = if let Address::P2Pk(ballot_token_owner) = address.address()
-        {
+        let ballot_token_owner = if let Address::P2Pk(ballot_token_owner) = address.address() {
             ballot_token_owner.h
         } else {
             panic!("Expected P2PK address");
@@ -429,7 +421,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
         let tx_context = build_tx_with_existing_ballot_box(
             &ballot_box,

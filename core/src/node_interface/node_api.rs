@@ -1,18 +1,20 @@
+use crate::oracle_config::ORACLE_SECRETS;
 use ergo_lib::chain::ergo_state_context::ErgoStateContext;
-use ergo_lib::chain::transaction::{Transaction, TxId};
 use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
+use ergo_lib::chain::transaction::{Transaction, TxId};
 use ergo_lib::ergotree_ir::chain::address::AddressEncoderError;
 use ergo_lib::ergotree_ir::chain::ergo_box::box_value::BoxValue;
 use ergo_lib::ergotree_ir::chain::ergo_box::ErgoBox;
 use ergo_lib::ergotree_ir::chain::token::{Token, TokenId};
-use ergo_lib::wallet::box_selector::{BoxSelection, BoxSelector, BoxSelectorError, ErgoBoxAssets, SimpleBoxSelector};
+use ergo_lib::wallet::box_selector::{
+    BoxSelection, BoxSelector, BoxSelectorError, ErgoBoxAssets, SimpleBoxSelector,
+};
 use ergo_lib::wallet::signing::TransactionContext;
 use ergo_lib::wallet::{Wallet, WalletError};
 use ergo_node_interface::scanning::NodeError;
 use ergo_node_interface::{NodeInterface, P2PKAddressString};
 use reqwest::Url;
 use thiserror::Error;
-use crate::oracle_config::ORACLE_SECRETS;
 
 pub trait NodeApiTrait {
     fn get_unspent_boxes_by_address_with_token_filter_option(
@@ -44,10 +46,7 @@ pub trait NodeApiTrait {
         transaction_context: TransactionContext<UnsignedTransaction>,
     ) -> Result<Transaction, NodeApiError>;
 
-    fn submit_transaction(
-        &self,
-        tx: &Transaction,
-    ) -> Result<TxId, NodeApiError>;
+    fn submit_transaction(&self, tx: &Transaction) -> Result<TxId, NodeApiError>;
 
     fn sign_and_submit_transaction(
         &self,
@@ -56,7 +55,6 @@ pub trait NodeApiTrait {
 }
 
 impl NodeApiTrait for NodeApi {
-
     fn get_unspent_boxes_by_address_with_token_filter_option(
         &self,
         address: &P2PKAddressString,
@@ -64,7 +62,12 @@ impl NodeApiTrait for NodeApi {
         target_tokens: Vec<Token>,
         filter_boxes_token_ids: Vec<TokenId>,
     ) -> Result<Vec<ErgoBox>, BoxSelectorError> {
-        self.get_unspent_boxes_by_address_with_token_filter_option(address, target_balance, target_tokens, filter_boxes_token_ids)
+        self.get_unspent_boxes_by_address_with_token_filter_option(
+            address,
+            target_balance,
+            target_tokens,
+            filter_boxes_token_ids,
+        )
     }
 
     fn get_unspent_boxes_by_address(
@@ -78,7 +81,7 @@ impl NodeApiTrait for NodeApi {
 
     fn get_unspent_boxes_by_token_id(
         &self,
-        token_id: &TokenId
+        token_id: &TokenId,
     ) -> Result<Vec<ErgoBox>, NodeApiError> {
         self.get_all_unspent_boxes_by_token_id(token_id)
     }
@@ -98,10 +101,7 @@ impl NodeApiTrait for NodeApi {
         self.sign_transaction(transaction_context)
     }
 
-    fn submit_transaction(
-        &self,
-        tx: &Transaction,
-    ) -> Result<TxId, NodeApiError> {
+    fn submit_transaction(&self, tx: &Transaction) -> Result<TxId, NodeApiError> {
         self.submit_transaction(tx)
     }
 
@@ -124,77 +124,132 @@ impl NodeApi {
     }
 
     /// Get unspent boxes by address with token filter option
-    pub fn get_unspent_boxes_by_address_with_token_filter_option(&self, address: &P2PKAddressString, target_balance: BoxValue, target_tokens: Vec<Token>, filter_boxes_token_ids: Vec<TokenId>) -> Result<Vec<ErgoBox>, BoxSelectorError> {
+    pub fn get_unspent_boxes_by_address_with_token_filter_option(
+        &self,
+        address: &P2PKAddressString,
+        target_balance: BoxValue,
+        target_tokens: Vec<Token>,
+        filter_boxes_token_ids: Vec<TokenId>,
+    ) -> Result<Vec<ErgoBox>, BoxSelectorError> {
         let default_limit = 100;
         let box_selector = SimpleBoxSelector::new();
         let mut unspent_boxes: Vec<ErgoBox> = vec![];
         let mut offset = 0;
         let mut selection: Option<Result<BoxSelection<ErgoBox>, BoxSelectorError>> = None;
         loop {
-            let boxes = self.node.unspent_boxes_by_address(address, offset, default_limit);
+            let boxes = self
+                .node
+                .unspent_boxes_by_address(address, offset, default_limit);
             if boxes.is_ok() {
                 let boxes_clone = boxes.unwrap().clone();
-                if boxes_clone.is_empty() { break; }
+                if boxes_clone.is_empty() {
+                    break;
+                }
                 for box_ in boxes_clone.iter() {
                     let tokens = box_.tokens().clone();
                     if tokens.is_none() {
                         unspent_boxes.push(box_.clone());
                     } else {
                         let tokens = tokens.unwrap().to_vec();
-                        if tokens.iter().any(|token| filter_boxes_token_ids.contains(&token.token_id)) {
+                        if tokens
+                            .iter()
+                            .any(|token| filter_boxes_token_ids.contains(&token.token_id))
+                        {
                             continue;
                         }
                         unspent_boxes.push(box_.clone());
                     }
                 }
-                let local_selection = box_selector.select(unspent_boxes.clone(), target_balance, target_tokens.as_slice());
+                let local_selection = box_selector.select(
+                    unspent_boxes.clone(),
+                    target_balance,
+                    target_tokens.as_slice(),
+                );
                 selection = Some(local_selection.clone());
-                if local_selection.is_ok() { break; }
+                if local_selection.is_ok() {
+                    break;
+                }
                 offset += default_limit;
-            } else { break; }
+            } else {
+                break;
+            }
         }
         log::trace!("get_unspent_boxes_by_address_with_token_filter_option for address: {:#?} and found {:#?} boxes", address, unspent_boxes.len());
         Ok(selection.unwrap()?.boxes.to_vec())
     }
 
     /// Get unspent boxes by address
-    pub fn get_unspent_boxes_by_address(&self, address: &P2PKAddressString, target_balance: BoxValue, target_tokens: Vec<Token>) -> Result<Vec<ErgoBox>, BoxSelectorError> {
+    pub fn get_unspent_boxes_by_address(
+        &self,
+        address: &P2PKAddressString,
+        target_balance: BoxValue,
+        target_tokens: Vec<Token>,
+    ) -> Result<Vec<ErgoBox>, BoxSelectorError> {
         let default_limit = 100;
         let box_selector = SimpleBoxSelector::new();
         let mut unspent_boxes: Vec<ErgoBox> = vec![];
         let mut offset = 0;
         let mut selection: Option<Result<BoxSelection<ErgoBox>, BoxSelectorError>> = None;
         loop {
-            let boxes = self.node.unspent_boxes_by_address(address, offset, default_limit);
+            let boxes = self
+                .node
+                .unspent_boxes_by_address(address, offset, default_limit);
             if boxes.is_ok() {
                 let mut boxes_clone = boxes.unwrap().clone();
-                if boxes_clone.is_empty() { break; }
+                if boxes_clone.is_empty() {
+                    break;
+                }
                 unspent_boxes.append(&mut boxes_clone);
-                let local_selection = box_selector.select(unspent_boxes.clone(), target_balance, target_tokens.as_slice());
+                let local_selection = box_selector.select(
+                    unspent_boxes.clone(),
+                    target_balance,
+                    target_tokens.as_slice(),
+                );
                 selection = Some(local_selection.clone());
-                if local_selection.is_ok() { break; }
+                if local_selection.is_ok() {
+                    break;
+                }
                 offset += default_limit;
-            } else { break; }
+            } else {
+                break;
+            }
         }
-        log::trace!("get_unspent_boxes_by_address for address: {:#?} and found {:#?} boxes", address, unspent_boxes.len());
+        log::trace!(
+            "get_unspent_boxes_by_address for address: {:#?} and found {:#?} boxes",
+            address,
+            unspent_boxes.len()
+        );
         Ok(selection.unwrap()?.boxes.to_vec())
     }
 
     /// Get unspent boxes by token id
-    pub fn get_all_unspent_boxes_by_token_id(&self, token_id: &TokenId) -> Result<Vec<ErgoBox>, NodeApiError> {
+    pub fn get_all_unspent_boxes_by_token_id(
+        &self,
+        token_id: &TokenId,
+    ) -> Result<Vec<ErgoBox>, NodeApiError> {
         let default_limit = 100;
         let mut unspent_boxes: Vec<ErgoBox> = vec![];
         let mut offset = 0;
         loop {
-            let boxes = self.node.unspent_boxes_by_token_id(token_id, offset, default_limit);
+            let boxes = self
+                .node
+                .unspent_boxes_by_token_id(token_id, offset, default_limit);
             if boxes.is_ok() {
                 let mut boxes_clone = boxes.unwrap().clone();
-                if boxes_clone.is_empty() { break; }
+                if boxes_clone.is_empty() {
+                    break;
+                }
                 unspent_boxes.append(&mut boxes_clone);
                 offset += default_limit;
-            } else { break; }
+            } else {
+                break;
+            }
         }
-        log::trace!("get_unspent_boxes_by_token_id for token: {:#?} and found {:#?} boxes", token_id, unspent_boxes.len());
+        log::trace!(
+            "get_unspent_boxes_by_token_id for token: {:#?} and found {:#?} boxes",
+            token_id,
+            unspent_boxes.len()
+        );
         Ok(unspent_boxes)
     }
 
@@ -219,30 +274,25 @@ impl NodeApi {
             serde_json::to_string_pretty(&transaction_context.spending_tx).unwrap()
         );
         let wallet = self.get_wallet()?;
-        let signed_tx = wallet.sign_transaction(transaction_context, &self.node.get_state_context()?, None);
+        let signed_tx =
+            wallet.sign_transaction(transaction_context, &self.node.get_state_context()?, None);
         match signed_tx {
             Ok(tx) => {
                 log::trace!(
-                "Signed transaction: {}",
-                serde_json::to_string_pretty(&tx).unwrap()
+                    "Signed transaction: {}",
+                    serde_json::to_string_pretty(&tx).unwrap()
                 );
                 Ok(tx)
             }
             Err(wallet_err) => {
-                log::error!(
-                "Sign Transaction Failed: {}",
-                wallet_err.to_string()
-                );
+                log::error!("Sign Transaction Failed: {}", wallet_err.to_string());
                 Err(NodeApiError::WalletError(wallet_err))
             }
         }
     }
 
     /// Submit a signed `Transaction` to the mempool.
-    pub fn submit_transaction(
-        &self,
-        tx: &Transaction
-    ) -> Result<TxId, NodeApiError> {
+    pub fn submit_transaction(&self, tx: &Transaction) -> Result<TxId, NodeApiError> {
         Ok(self.node.submit_transaction(tx)?)
     }
 
@@ -265,7 +315,7 @@ impl NodeApi {
         Ok(loop {
             if indexer_status.is_sync {
                 log::debug!("Your indexer synced successfully.");
-                break
+                break;
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
         })

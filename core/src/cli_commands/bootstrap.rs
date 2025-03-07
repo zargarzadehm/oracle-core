@@ -1,6 +1,7 @@
 //! Bootstrap a new oracle pool
 use std::{convert::TryInto, io::Write, path::Path};
 
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_lib::{
     chain::{
         ergo_box::box_builder::{ErgoBoxCandidateBuilder, ErgoBoxCandidateBuilderError},
@@ -23,7 +24,6 @@ use ergo_lib::{
         tx_builder::{TxBuilder, TxBuilderError},
     },
 };
-use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_node_interface::node_interface::NodeError;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -43,9 +43,7 @@ use crate::{
         },
     },
     explorer_api::wait_for_txs_confirmation,
-    node_interface::{
-        node_api::{NodeApi, NodeApiTrait, NodeApiError},
-    },
+    node_interface::node_api::{NodeApi, NodeApiError, NodeApiTrait},
     oracle_config::{BASE_FEE, ORACLE_CONFIG},
     oracle_types::{BlockHeight, EpochCounter},
     pool_config::{
@@ -241,7 +239,11 @@ pub(crate) fn perform_bootstrap_chained_transaction(
     info!("Creating and signing minting pool NFT tx");
     let target_balance = calc_target_balance(num_transactions_left)?;
     debug!("target_balance: {:?}", target_balance);
-    let unspent_boxes = node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), target_balance, [].into())?;
+    let unspent_boxes = node_api.get_unspent_boxes_by_address(
+        &oracle_address.to_base58(),
+        target_balance,
+        [].into(),
+    )?;
     debug!("unspent boxes: {:?}", unspent_boxes);
     let box_selector = SimpleBoxSelector::new();
     let box_selection = box_selector.select(unspent_boxes.clone(), target_balance, &[])?;
@@ -718,7 +720,7 @@ pub(crate) mod tests {
                 ctx: ctx.clone(),
                 secrets: vec![secret.clone().into()],
                 submitted_txs: &submit_tx.transactions,
-                chain_submit_tx: None
+                chain_submit_tx: None,
             },
             tx_fee: *BASE_FEE,
             erg_value_per_box: *BASE_FEE,

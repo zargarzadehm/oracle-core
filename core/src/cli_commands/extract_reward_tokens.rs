@@ -1,9 +1,11 @@
 use std::convert::TryInto;
 
+use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
+use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
+use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_lib::{
-    chain::{
-        ergo_box::box_builder::{ErgoBoxCandidateBuilder, ErgoBoxCandidateBuilderError},
-    },
+    chain::ergo_box::box_builder::{ErgoBoxCandidateBuilder, ErgoBoxCandidateBuilderError},
     ergotree_interpreter::sigma_protocol::prover::ContextExtension,
     ergotree_ir::{
         chain::{
@@ -17,13 +19,11 @@ use ergo_lib::{
         tx_builder::{TxBuilder, TxBuilderError},
     },
 };
-use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
-use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
-use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
-use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_node_interface::node_interface::NodeError;
 use thiserror::Error;
 
+use crate::node_interface::node_api::NodeApiTrait;
+use crate::oracle_config::ORACLE_CONFIG;
 use crate::{
     box_kind::{
         make_collected_oracle_box_candidate, make_oracle_box_candidate, OracleBox, OracleBoxWrapper,
@@ -34,8 +34,6 @@ use crate::{
     oracle_types::BlockHeight,
     spec_token::SpecToken,
 };
-use crate::node_interface::node_api::NodeApiTrait;
-use crate::oracle_config::ORACLE_CONFIG;
 
 #[derive(Debug, Error)]
 pub enum ExtractRewardTokensActionError {
@@ -168,7 +166,11 @@ fn build_extract_reward_tokens_tx(
 
         // `BASE_FEE` each for the fee and the box holding the extracted reward tokens.
         let target_balance = BASE_FEE.checked_mul_u32(2).unwrap();
-        let unspent_boxes = node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), target_balance, [].into())?;
+        let unspent_boxes = node_api.get_unspent_boxes_by_address(
+            &oracle_address.to_base58(),
+            target_balance,
+            [].into(),
+        )?;
 
         let box_selector = SimpleBoxSelector::new();
         let selection = box_selector.select(unspent_boxes, target_balance, &[])?;
@@ -210,16 +212,15 @@ mod tests {
     use super::*;
     use crate::box_kind::{OracleBoxWrapper, OracleBoxWrapperInputs};
     use crate::contracts::oracle::OracleContractParameters;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use crate::oracle_types::EpochCounter;
     use crate::pool_commands::test_utils::{
-        generate_token_ids, make_datapoint_box, make_wallet_unspent_box,
-        OracleBoxMock,
+        generate_token_ids, make_datapoint_box, make_wallet_unspent_box, OracleBoxMock,
     };
     use ergo_lib::chain::ergo_state_context::ErgoStateContext;
     use ergo_lib::ergotree_interpreter::sigma_protocol::private_input::DlogProverInput;
     use ergo_lib::ergotree_ir::chain::address::AddressEncoder;
     use sigma_test_util::force_any_val;
-    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[test]
     fn test_extract_reward_tokens() {
@@ -264,7 +265,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
         let (tx_context, num_reward_tokens) = build_extract_reward_tokens_tx(
             &local_datapoint_box_source,

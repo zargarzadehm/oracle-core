@@ -28,6 +28,7 @@ mod contracts;
 mod datapoint_source;
 mod default_parameters;
 mod explorer_api;
+mod get_boxes;
 mod logging;
 mod metrics;
 mod migrate;
@@ -38,7 +39,6 @@ mod oracle_state;
 mod oracle_types;
 mod pool_commands;
 mod pool_config;
-mod get_boxes;
 mod serde;
 mod spec_token;
 mod state;
@@ -47,6 +47,19 @@ mod util;
 #[cfg(test)]
 mod tests;
 
+use crate::actions::execute_action;
+use crate::address_util::pks_to_network_addresses;
+use crate::api::start_rest_server;
+use crate::box_kind::BallotBox;
+use crate::contracts::ballot::BallotContract;
+use crate::default_parameters::print_contract_hashes;
+use crate::get_boxes::TokenFetchRegistry;
+use crate::migrate::check_migration_to_split_config;
+use crate::oracle_config::OracleConfig;
+use crate::oracle_config::DEFAULT_ORACLE_CONFIG_FILE_NAME;
+use crate::oracle_config::ORACLE_CONFIG_FILE_PATH;
+use crate::oracle_config::ORACLE_CONFIG_OPT;
+use crate::pool_config::POOL_CONFIG_FILE_PATH;
 use action_report::ActionReportStorage;
 use action_report::PoolActionReport;
 use actions::PoolAction;
@@ -87,19 +100,6 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
-use crate::actions::execute_action;
-use crate::address_util::pks_to_network_addresses;
-use crate::api::start_rest_server;
-use crate::box_kind::BallotBox;
-use crate::contracts::ballot::BallotContract;
-use crate::default_parameters::print_contract_hashes;
-use crate::migrate::check_migration_to_split_config;
-use crate::oracle_config::OracleConfig;
-use crate::oracle_config::DEFAULT_ORACLE_CONFIG_FILE_NAME;
-use crate::oracle_config::ORACLE_CONFIG_FILE_PATH;
-use crate::oracle_config::ORACLE_CONFIG_OPT;
-use crate::pool_config::POOL_CONFIG_FILE_PATH;
-use crate::get_boxes::TokenFetchRegistry;
 
 const APP_VERSION: &str = concat!(
     "v",
@@ -272,9 +272,7 @@ fn main() {
         Arc::new(RwLock::new(ActionReportStorage::new()));
 
     log_on_launch();
-    let node_api = NodeApi::new(
-        &ORACLE_CONFIG.node_url,
-    );
+    let node_api = NodeApi::new(&ORACLE_CONFIG.node_url);
 
     if !node_api.node.indexer_status().unwrap().is_active {
         error!("Blockchain indexer is not active on the node");
@@ -454,12 +452,9 @@ fn handle_pool_command(command: Command, node_api: &NodeApi, network_prefix: Net
             reward_token_amount,
         } => {
             let reward_token_opt = check_reward_token_opt(reward_token_id, reward_token_amount);
-            if let Err(e) = cli_commands::update_pool::update_pool(
-                &op,
-                node_api,
-                reward_token_opt,
-                height,
-            ) {
+            if let Err(e) =
+                cli_commands::update_pool::update_pool(&op, node_api, reward_token_opt, height)
+            {
                 error!("Fatal update-pool error: {:?}", e);
                 std::process::exit(exitcode::SOFTWARE);
             }
@@ -482,7 +477,7 @@ fn handle_pool_command(command: Command, node_api: &NodeApi, network_prefix: Net
                 &POOL_CONFIG.token_ids.oracle_token_id,
                 &POOL_CONFIG.token_ids.reward_token_id,
                 POOL_CONFIG_FILE_PATH.get().unwrap(),
-                op.get_local_datapoint_box_source()
+                op.get_local_datapoint_box_source(),
             ) {
                 error!("Fatal import pool update error : {:?}", e);
                 std::process::exit(exitcode::SOFTWARE);

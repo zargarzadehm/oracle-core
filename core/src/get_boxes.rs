@@ -8,9 +8,9 @@ use thiserror::Error;
 mod generic_token_fetch;
 mod registry;
 
+use crate::spec_token::TokenIdKind;
 pub use generic_token_fetch::*;
 pub use registry::*;
-use crate::spec_token::TokenIdKind;
 
 #[derive(Debug, Error)]
 pub enum GetBoxesError {
@@ -26,9 +26,7 @@ pub enum GetBoxesError {
 
 pub trait GetBoxes: TokenIdKind {
     fn get_boxes(&self) -> Result<Vec<ErgoBox>, GetBoxesError> {
-        let node_api = NodeApi::new(
-            &ORACLE_CONFIG.node_url
-        );
+        let node_api = NodeApi::new(&ORACLE_CONFIG.node_url);
         let boxes = node_api.get_all_unspent_boxes_by_token_id(&self.token_id())?;
         Ok(boxes)
     }

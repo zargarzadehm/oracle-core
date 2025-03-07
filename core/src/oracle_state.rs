@@ -6,10 +6,10 @@ use crate::box_kind::{
     UpdateBoxWrapper, UpdateBoxWrapperInputs, VoteBallotBoxWrapper,
 };
 use crate::datapoint_source::DataPointSourceError;
+use crate::get_boxes::{GenericTokenFetch, GetBoxes, GetBoxesError, TokenFetchRegistry};
 use crate::oracle_config::ORACLE_CONFIG;
 use crate::oracle_types::{BlockHeight, EpochCounter, Rate};
 use crate::pool_config::POOL_CONFIG;
-use crate::get_boxes::{GenericTokenFetch, GetBoxes, TokenFetchRegistry, GetBoxesError};
 use crate::spec_token::{
     BallotTokenId, BuybackTokenId, OracleTokenId, PoolTokenId, RefreshTokenId, RewardTokenId,
     TokenIdKind, UpdateTokenId,
@@ -172,7 +172,9 @@ pub enum LocalDatapointState {
 }
 
 impl OraclePool {
-    pub fn new(token_fetch_registry: &TokenFetchRegistry) -> std::result::Result<OraclePool, Error> {
+    pub fn new(
+        token_fetch_registry: &TokenFetchRegistry,
+    ) -> std::result::Result<OraclePool, Error> {
         let pool_config = &POOL_CONFIG;
         let oracle_config = &ORACLE_CONFIG;
         let oracle_pk = oracle_config.oracle_address_p2pk()?;

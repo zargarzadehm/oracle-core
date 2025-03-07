@@ -1,7 +1,6 @@
 /// This file holds all the actions which can be performed
 /// by an oracle part of the oracle pool. These actions
 /// are implemented on the `OraclePool` struct.
-
 use derive_more::From;
 use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
 use ergo_lib::wallet::signing::TransactionContext;
@@ -24,12 +23,12 @@ pub enum PoolAction {
 
 #[derive(Debug)]
 pub struct RefreshAction {
-    pub transaction_context: TransactionContext<UnsignedTransaction>
+    pub transaction_context: TransactionContext<UnsignedTransaction>,
 }
 
 #[derive(Debug)]
 pub struct PublishDataPointAction {
-    pub transaction_context: TransactionContext<UnsignedTransaction>
+    pub transaction_context: TransactionContext<UnsignedTransaction>,
 }
 
 #[derive(Error, Debug)]

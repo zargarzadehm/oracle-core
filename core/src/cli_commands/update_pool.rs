@@ -1,28 +1,5 @@
-use ergo_lib::{
-    chain::{
-        ergo_box::box_builder::ErgoBoxCandidateBuilder,
-        ergo_box::box_builder::ErgoBoxCandidateBuilderError,
-    },
-    ergo_chain_types::blake2b256_hash,
-    ergotree_interpreter::sigma_protocol::prover::ContextExtension,
-    ergotree_ir::chain::{
-        address::Address,
-        ergo_box::{NonMandatoryRegisterId},
-    },
-    ergotree_ir::serialization::SigmaSerializable,
-    wallet::{
-        box_selector::{BoxSelection, BoxSelectorError},
-        signing::TxSigningError,
-        tx_builder::{TxBuilder, TxBuilderError},
-    },
-};
-use ergo_node_interface::node_interface::NodeError;
-use log::{error, info};
-use std::convert::TryInto;
-use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
-use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
-use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
-use ergo_lib::wallet::signing::TransactionContext;
+use crate::node_interface::node_api::NodeApiTrait;
+use crate::oracle_config::ORACLE_CONFIG;
 use crate::{
     box_kind::{
         make_pool_box_candidate_unchecked, BallotBox, CastBallotBoxVoteParameters, PoolBox,
@@ -38,9 +15,29 @@ use crate::{
     pool_config::{PoolConfig, POOL_CONFIG},
     spec_token::{RewardTokenId, SpecToken, TokenIdKind},
 };
+use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
+use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
+use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
+use ergo_lib::wallet::signing::TransactionContext;
+use ergo_lib::{
+    chain::{
+        ergo_box::box_builder::ErgoBoxCandidateBuilder,
+        ergo_box::box_builder::ErgoBoxCandidateBuilderError,
+    },
+    ergo_chain_types::blake2b256_hash,
+    ergotree_interpreter::sigma_protocol::prover::ContextExtension,
+    ergotree_ir::chain::{address::Address, ergo_box::NonMandatoryRegisterId},
+    ergotree_ir::serialization::SigmaSerializable,
+    wallet::{
+        box_selector::{BoxSelection, BoxSelectorError},
+        signing::TxSigningError,
+        tx_builder::{TxBuilder, TxBuilderError},
+    },
+};
+use ergo_node_interface::node_interface::NodeError;
+use log::{error, info};
+use std::convert::TryInto;
 use thiserror::Error;
-use crate::node_interface::node_api::NodeApiTrait;
-use crate::oracle_config::ORACLE_CONFIG;
 
 #[derive(Debug, Error)]
 pub enum UpdatePoolError {
@@ -346,13 +343,12 @@ fn build_update_pool_box_tx(
         };
 
     // Find unspent boxes without ballot token, see: https://github.com/ergoplatform/oracle-core/pull/80#issuecomment-1200258458
-    let unspent_boxes = node_api
-        .get_unspent_boxes_by_address_with_token_filter_option(
-            &oracle_address.to_base58(),
-            target_balance,
-            target_tokens.clone(),
-            vec![update_box.ballot_token_id()]
-        )?;
+    let unspent_boxes = node_api.get_unspent_boxes_by_address_with_token_filter_option(
+        &oracle_address.to_base58(),
+        target_balance,
+        target_tokens.clone(),
+        vec![update_box.ballot_token_id()],
+    )?;
 
     if unspent_boxes.is_empty() {
         error!("Could not find unspent wallet boxes that do not contain ballot token. Please move ballot tokens to another address");
@@ -438,6 +434,9 @@ mod tests {
     use sigma_test_util::force_any_val;
     use std::convert::TryInto;
 
+    use super::build_update_pool_box_tx;
+    use crate::node_interface::node_api::NodeApiTrait;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use crate::{
         box_kind::{
             make_local_ballot_box_candidate, make_pool_box_candidate, PoolBoxWrapper,
@@ -456,9 +455,6 @@ mod tests {
         },
         spec_token::{RefreshTokenId, RewardTokenId, SpecToken, TokenIdKind},
     };
-    use crate::node_interface::node_api::NodeApiTrait;
-    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
-    use super::build_update_pool_box_tx;
 
     fn force_any_tokenid() -> TokenId {
         use proptest::strategy::Strategy;
@@ -612,7 +608,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
         let update_mock = UpdateBoxMock {
             update_box: UpdateBoxWrapper::new(

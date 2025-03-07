@@ -6,9 +6,9 @@ use crate::spec_token::PoolTokenId;
 use crate::spec_token::RefreshTokenId;
 use crate::spec_token::UpdateTokenId;
 
+use super::generic_token_fetch::GenericTokenFetch;
 use ::serde::Deserialize;
 use ::serde::Serialize;
-use super::generic_token_fetch::GenericTokenFetch;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TokenFetchRegistry {
@@ -26,7 +26,6 @@ pub struct TokenFetchRegistry {
 }
 
 impl TokenFetchRegistry {
-
     pub fn load() -> Result<Self, anyhow::Error> {
         log::info!("Registering token fetches");
         let pool_config = &POOL_CONFIG;

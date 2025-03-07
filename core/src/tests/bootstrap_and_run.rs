@@ -1,13 +1,5 @@
 use std::convert::TryInto;
 
-use ergo_chain_sim::ChainSim;
-use ergo_lib::chain::ergo_state_context::ErgoStateContext;
-use ergo_lib::ergotree_interpreter::sigma_protocol::private_input::DlogProverInput;
-use ergo_lib::ergotree_ir::chain::address::Address;
-use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
-use ergo_lib::ergotree_ir::chain::address::NetworkPrefix;
-use ergo_lib::wallet::secret_key::SecretKey;
-use sigma_test_util::force_any_val;
 use crate::cli_commands::bootstrap::perform_bootstrap_chained_transaction;
 use crate::cli_commands::bootstrap::BootstrapConfig;
 use crate::cli_commands::bootstrap::BootstrapInput;
@@ -16,8 +8,20 @@ use crate::oracle_config::BASE_FEE;
 use crate::oracle_types::BlockHeight;
 use crate::pool_commands::test_utils::init_log_tests;
 use crate::pool_config::PoolConfig;
+use ergo_chain_sim::ChainSim;
+use ergo_lib::chain::ergo_state_context::ErgoStateContext;
+use ergo_lib::ergotree_interpreter::sigma_protocol::private_input::DlogProverInput;
+use ergo_lib::ergotree_ir::chain::address::Address;
+use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
+use ergo_lib::ergotree_ir::chain::address::NetworkPrefix;
+use ergo_lib::wallet::secret_key::SecretKey;
+use sigma_test_util::force_any_val;
 
-fn bootstrap(secrets: Vec<SecretKey>, net_address: &NetworkAddress, chain: &mut ChainSim) -> PoolConfig {
+fn bootstrap(
+    secrets: Vec<SecretKey>,
+    net_address: &NetworkAddress,
+    chain: &mut ChainSim,
+) -> PoolConfig {
     let ctx = force_any_val::<ErgoStateContext>();
 
     let unspent_boxes = chain.get_unspent_boxes(&net_address.address().script().unwrap());
@@ -35,7 +39,7 @@ fn bootstrap(secrets: Vec<SecretKey>, net_address: &NetworkAddress, chain: &mut 
             unspent_boxes: unspent_boxes.clone(),
             ctx: ctx.clone(),
             secrets,
-            chain_submit_tx: Some(& mut submit_tx_mock),
+            chain_submit_tx: Some(&mut submit_tx_mock),
             submitted_txs: &SubmitTxMock::default().transactions,
         },
         tx_fee: *BASE_FEE,

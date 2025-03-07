@@ -5,6 +5,9 @@ use std::{
 };
 
 use anyhow::Context;
+use ergo_lib::wallet::ext_secret_key::ExtSecretKey;
+use ergo_lib::wallet::mnemonic::Mnemonic;
+use ergo_lib::wallet::secret_key::SecretKey;
 use ergo_lib::{
     ergotree_ir::chain::address::NetworkAddress,
     ergotree_ir::{
@@ -16,10 +19,7 @@ use ergo_lib::{
     },
     wallet::tx_builder::{self, SUGGESTED_TX_FEE},
 };
-use ergo_lib::wallet::ext_secret_key::ExtSecretKey;
-use ergo_lib::wallet::mnemonic::Mnemonic;
-use ergo_lib::wallet::secret_key::SecretKey;
-use log::{LevelFilter};
+use log::LevelFilter;
 use once_cell::sync;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -54,13 +54,11 @@ impl OracleSecrets {
 
         let seed = Mnemonic::to_seed(&mnemonic, "");
         let ext_sk = ExtSecretKey::derive_master(seed).unwrap();
-         // bip-32 path for the first key
+        // bip-32 path for the first key
         let path = "m/44'/429'/0'/0/0";
         let secret = ext_sk.derive(path.parse().unwrap()).unwrap().secret_key();
 
-        Self {
-            secret_key: secret,
-        }
+        Self { secret_key: secret }
     }
 }
 

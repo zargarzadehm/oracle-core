@@ -36,9 +36,9 @@ use ergo_lib::wallet::tx_builder::TxBuilder;
 use ergo_lib::wallet::tx_builder::TxBuilderError;
 use thiserror::Error;
 
-use std::convert::TryInto;
-use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use crate::address_util::address_to_p2pk;
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
+use std::convert::TryInto;
 
 #[derive(Debug, Error)]
 pub enum RefreshActionError {
@@ -122,7 +122,8 @@ pub fn build_refresh_action(
         .transpose()?
         .flatten();
 
-    let unspent_boxes = node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), tx_fee, vec![])?;
+    let unspent_boxes =
+        node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), tx_fee, vec![])?;
     let box_selector = SimpleBoxSelector::new();
     let selection = box_selector.select(unspent_boxes, tx_fee, &[])?;
 
@@ -220,7 +221,12 @@ pub fn build_refresh_action(
         Ok(ctx) => ctx,
         Err(e) => return Err(RefreshActionError::TxSigningError(e)),
     };
-    Ok((RefreshAction { transaction_context: context }, report))
+    Ok((
+        RefreshAction {
+            transaction_context: context,
+        },
+        report,
+    ))
 }
 
 fn filtered_oracle_boxes_by_rate<T>(
@@ -404,11 +410,11 @@ mod tests {
     use crate::oracle_config::BASE_FEE;
     use crate::oracle_state::DataSourceError;
     use crate::oracle_types::EpochLength;
+    use crate::pool_commands::test_utils::generate_token_ids;
     use crate::pool_commands::test_utils::BuybackBoxSourceMock;
     use crate::pool_commands::test_utils::{
         make_datapoint_box, make_pool_box, make_wallet_unspent_box, PoolBoxMock,
     };
-    use crate::pool_commands::test_utils::generate_token_ids;
     use crate::pool_config::TokenIds;
     use crate::spec_token::TokenIdKind;
 
@@ -447,8 +453,8 @@ mod tests {
             inputs.refresh_nft_token_id.token_id(),
             1u64.try_into().unwrap(),
         ))]
-            .try_into()
-            .unwrap();
+        .try_into()
+        .unwrap();
         RefreshBoxWrapper::new(
             ErgoBox::new(
                 value,
@@ -461,10 +467,10 @@ mod tests {
                 force_any_val::<TxId>(),
                 0,
             )
-                .unwrap(),
+            .unwrap(),
             inputs,
         )
-            .unwrap()
+        .unwrap()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -533,7 +539,10 @@ mod tests {
             &token_ids,
         );
         let secret = force_any_val::<DlogProverInput>();
-        let oracle_address = NetworkAddress::new(NetworkPrefix::Mainnet, &Address::P2Pk(secret.public_image().clone()));
+        let oracle_address = NetworkAddress::new(
+            NetworkPrefix::Mainnet,
+            &Address::P2Pk(secret.public_image().clone()),
+        );
         let oracle_pub_key = secret.public_image().h;
 
         let oracle_pub_keys = vec![
@@ -576,7 +585,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
 
         let (action, report) = build_refresh_action(
@@ -597,7 +606,9 @@ mod tests {
 
         assert_eq!(report.oracle_boxes_collected.len(), 5);
 
-        let _signed_tx = mock_node_api.sign_transaction(action.transaction_context).unwrap();
+        let _signed_tx = mock_node_api
+            .sign_transaction(action.transaction_context)
+            .unwrap();
 
         let wrong_epoch_id_datapoints_mock = DatapointSourceMock {
             datapoints: make_datapoint_boxes(

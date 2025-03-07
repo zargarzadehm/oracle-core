@@ -7,6 +7,7 @@ use std::{
 };
 
 use derive_more::From;
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_lib::{
     chain::{
         ergo_box::box_builder::{ErgoBoxCandidateBuilder, ErgoBoxCandidateBuilderError},
@@ -30,12 +31,13 @@ use ergo_lib::{
         tx_builder::{TxBuilder, TxBuilderError},
     },
 };
-use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_node_interface::node_interface::NodeError;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::bootstrap::{NftMintDetails, TokenMintDetails};
+use crate::node_interface::node_api::NodeApiTrait;
 use crate::{
     box_kind::{
         make_refresh_box_candidate, BallotBoxWrapperInputs, PoolBox, PoolBoxWrapperInputs,
@@ -53,9 +55,7 @@ use crate::{
         },
     },
     explorer_api::wait_for_txs_confirmation,
-    node_interface::{
-        node_api::{NodeApi, NodeApiError}
-    },
+    node_interface::node_api::{NodeApi, NodeApiError},
     oracle_config::{OracleConfig, BASE_FEE, ORACLE_CONFIG},
     oracle_state::{DataSourceError, OraclePool},
     oracle_types::BlockHeight,
@@ -65,8 +65,6 @@ use crate::{
         BallotTokenId, OracleTokenId, RefreshTokenId, RewardTokenId, TokenIdKind, UpdateTokenId,
     },
 };
-use crate::node_interface::node_api::NodeApiTrait;
-use super::bootstrap::{NftMintDetails, TokenMintDetails};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct UpdateTokensToMint {
@@ -269,10 +267,7 @@ impl<'a> PrepareUpdate<'a> {
             Ok(ctx) => ctx,
             Err(e) => return Err(PrepareUpdateError::TxSigningError(e)),
         };
-        let signed_tx =
-            self.input
-                .node_api
-                .sign_transaction(context)?;
+        let signed_tx = self.input.node_api.sign_transaction(context)?;
         self.num_transactions_left -= 1;
         self.built_txs.push(signed_tx.clone());
         self.inputs_for_next_tx = self.filter_tx_outputs(signed_tx.outputs.clone());
@@ -345,7 +340,11 @@ impl<'a> PrepareUpdate<'a> {
 
         let target_balance = self.calc_target_balance(self.num_transactions_left)?;
         debug!("target_balance: {:?}", target_balance);
-        let unspent_boxes = self.input.node_api.get_unspent_boxes_by_address(&self.oracle_config.oracle_address.to_base58(), target_balance, [].into())?;
+        let unspent_boxes = self.input.node_api.get_unspent_boxes_by_address(
+            &self.oracle_config.oracle_address.to_base58(),
+            target_balance,
+            [].into(),
+        )?;
         let box_selector = SimpleBoxSelector::new();
         let box_selection = box_selector.select(unspent_boxes.clone(), target_balance, &[])?;
         debug!("box selection: {:?}", box_selection);
@@ -558,6 +557,8 @@ pub enum PrepareUpdateError {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use ergo_lib::{
         chain::{ergo_state_context::ErgoStateContext, transaction::TxId},
         ergotree_interpreter::sigma_protocol::private_input::DlogProverInput,
@@ -568,8 +569,6 @@ mod test {
         wallet::Wallet,
     };
     use sigma_test_util::force_any_val;
-    use super::*;
-    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[test]
     fn test_prepare_update_transaction() {
@@ -700,7 +699,7 @@ data_point_source_custom_script: ~
                 ctx: ctx.clone(),
                 secrets: vec![secret.clone().into()],
                 submitted_txs: &submit_tx.transactions,
-                chain_submit_tx: None
+                chain_submit_tx: None,
             },
             tx_fee: *BASE_FEE,
             erg_value_per_box: *BASE_FEE,

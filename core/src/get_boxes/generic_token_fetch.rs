@@ -57,7 +57,7 @@ impl<T: TokenIdKind + Clone> TokenIdKind for GenericTokenFetch<T> {
     }
 
     fn from_token_id_unchecked(token: TokenId) -> Self {
-     Self::new(token)
+        Self::new(token)
     }
 }
 

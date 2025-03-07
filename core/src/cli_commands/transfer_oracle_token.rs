@@ -1,5 +1,9 @@
 use std::convert::TryInto;
 
+use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
+use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
+use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_lib::{
     chain::ergo_box::box_builder::ErgoBoxCandidateBuilderError,
     ergotree_interpreter::sigma_protocol::prover::ContextExtension,
@@ -12,13 +16,11 @@ use ergo_lib::{
         tx_builder::{TxBuilder, TxBuilderError},
     },
 };
-use ergo_lib::chain::transaction::unsigned::UnsignedTransaction;
-use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
-use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
-use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_node_interface::node_interface::NodeError;
 use thiserror::Error;
 
+use crate::node_interface::node_api::NodeApiTrait;
+use crate::oracle_config::ORACLE_CONFIG;
 use crate::{
     box_kind::{
         make_collected_oracle_box_candidate, make_oracle_box_candidate, OracleBox, OracleBoxWrapper,
@@ -28,8 +30,6 @@ use crate::{
     oracle_state::{DataSourceError, LocalDatapointBoxSource},
     oracle_types::BlockHeight,
 };
-use crate::node_interface::node_api::NodeApiTrait;
-use crate::oracle_config::ORACLE_CONFIG;
 
 #[derive(Debug, Error)]
 pub enum TransferOracleTokenActionError {
@@ -149,7 +149,11 @@ fn build_transfer_oracle_token_tx(
 
         let target_balance = *BASE_FEE;
 
-        let unspent_boxes = node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), target_balance, [].into())?;
+        let unspent_boxes = node_api.get_unspent_boxes_by_address(
+            &oracle_address.to_base58(),
+            target_balance,
+            [].into(),
+        )?;
         let box_selector = SimpleBoxSelector::new();
         let selection = box_selector.select(unspent_boxes, target_balance, &[])?;
         let mut input_boxes = vec![in_oracle_box.get_box().clone()];
@@ -190,16 +194,15 @@ mod tests {
     use super::*;
     use crate::box_kind::{OracleBoxWrapper, OracleBoxWrapperInputs};
     use crate::contracts::oracle::OracleContractParameters;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use crate::oracle_types::EpochCounter;
     use crate::pool_commands::test_utils::{
-        generate_token_ids, make_datapoint_box, make_wallet_unspent_box,
-        OracleBoxMock,
+        generate_token_ids, make_datapoint_box, make_wallet_unspent_box, OracleBoxMock,
     };
     use ergo_lib::chain::ergo_state_context::ErgoStateContext;
     use ergo_lib::ergotree_interpreter::sigma_protocol::private_input::DlogProverInput;
     use ergo_lib::ergotree_ir::chain::address::AddressEncoder;
     use sigma_test_util::force_any_val;
-    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[test]
     fn test_transfer_oracle_datapoint() {
@@ -242,7 +245,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
         let context = build_transfer_oracle_token_tx(
             &local_datapoint_box_source,

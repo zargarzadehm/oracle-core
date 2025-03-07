@@ -1,5 +1,8 @@
 use std::convert::TryFrom;
 
+use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
+use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_lib::{
     chain::ergo_box::box_builder::ErgoBoxCandidateBuilderError,
     ergotree_interpreter::sigma_protocol::prover::ContextExtension,
@@ -9,11 +12,10 @@ use ergo_lib::{
         tx_builder::{TxBuilder, TxBuilderError},
     },
 };
-use ergo_lib::ergotree_ir::chain::address::NetworkAddress;
-use ergo_lib::wallet::box_selector::{BoxSelector, SimpleBoxSelector};
-use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use thiserror::Error;
 
+use crate::address_util::address_to_p2pk;
+use crate::node_interface::node_api::NodeApiTrait;
 use crate::{
     action_report::PublishDatapointActionReport,
     actions::PublishDataPointAction,
@@ -25,8 +27,6 @@ use crate::{
     oracle_types::{BlockHeight, EpochCounter},
     spec_token::{OracleTokenId, RewardTokenId, SpecToken},
 };
-use crate::address_util::address_to_p2pk;
-use crate::node_interface::node_api::NodeApiTrait;
 
 #[derive(Debug, Error)]
 pub enum PublishDatapointActionError {
@@ -82,7 +82,8 @@ pub fn build_subsequent_publish_datapoint_action(
     )?;
     let box_selector = SimpleBoxSelector::new();
     let tx_fee = *BASE_FEE;
-    let mut unspent_boxes = node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), tx_fee, vec![])?;
+    let mut unspent_boxes =
+        node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), tx_fee, vec![])?;
     let target_tokens = vec![
         in_oracle_box.oracle_token().into(),
         outbox_reward_tokens.into(),
@@ -112,7 +113,12 @@ pub fn build_subsequent_publish_datapoint_action(
         Ok(ctx) => ctx,
         Err(e) => return Err(PublishDatapointActionError::TxSigningError(e)),
     };
-    Ok((PublishDataPointAction { transaction_context: context }, report))
+    Ok((
+        PublishDataPointAction {
+            transaction_context: context,
+        },
+        report,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -139,11 +145,13 @@ pub fn build_publish_first_datapoint_action(
     let contract = OracleContract::checked_load(&inputs.contract_inputs)?;
     let min_storage_rent = contract.parameters().min_storage_rent;
     let target_balance = min_storage_rent.checked_add(&tx_fee).unwrap();
-    let target_tokens = vec![
-        oracle_token.clone().into(), reward_token.clone().into()
-    ];
+    let target_tokens = vec![oracle_token.clone().into(), reward_token.clone().into()];
 
-    let unspent_boxes = node_api.get_unspent_boxes_by_address(&oracle_address.to_base58(), target_balance, target_tokens.clone())?;
+    let unspent_boxes = node_api.get_unspent_boxes_by_address(
+        &oracle_address.to_base58(),
+        target_balance,
+        target_tokens.clone(),
+    )?;
     let box_selection = box_selector.select(
         unspent_boxes.clone(),
         target_balance,
@@ -184,7 +192,12 @@ pub fn build_publish_first_datapoint_action(
         Ok(ctx) => ctx,
         Err(e) => return Err(PublishDatapointActionError::TxSigningError(e)),
     };
-    Ok((PublishDataPointAction { transaction_context: context }, report))
+    Ok((
+        PublishDataPointAction {
+            transaction_context: context,
+        },
+        report,
+    ))
 }
 
 #[cfg(test)]
@@ -193,8 +206,11 @@ mod tests {
 
     use super::*;
     use crate::contracts::oracle::OracleContractParameters;
+    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
     use crate::oracle_types::{EpochLength, Rate};
-    use crate::pool_commands::test_utils::{generate_token_ids, make_datapoint_box, make_wallet_unspent_box};
+    use crate::pool_commands::test_utils::{
+        generate_token_ids, make_datapoint_box, make_wallet_unspent_box,
+    };
     use crate::spec_token::TokenIdKind;
     use ergo_lib::chain::ergo_state_context::ErgoStateContext;
     use ergo_lib::chain::transaction::TxId;
@@ -206,7 +222,6 @@ mod tests {
     use ergo_lib::ergotree_ir::mir::constant::Constant;
     use ergo_lib::ergotree_ir::mir::expr::Expr;
     use sigma_test_util::force_any_val;
-    use crate::node_interface::test_utils::{MockNodeApi, SubmitTxMock};
 
     #[derive(Debug)]
     struct MockDatapointSource {
@@ -227,7 +242,10 @@ mod tests {
         let oracle_contract_parameters = OracleContractParameters::default();
         let pool_box_epoch_id = EpochCounter(1);
         let secret = force_any_val::<DlogProverInput>();
-        let oracle_address = NetworkAddress::new(NetworkPrefix::Mainnet, &Address::P2Pk(secret.public_image().clone()));
+        let oracle_address = NetworkAddress::new(
+            NetworkPrefix::Mainnet,
+            &Address::P2Pk(secret.public_image().clone()),
+        );
         let oracle_pub_key = secret.public_image().h;
         let oracle_box_wrapper_inputs =
             OracleBoxWrapperInputs::try_from((oracle_contract_parameters, &token_ids)).unwrap();
@@ -263,7 +281,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
 
         let datapoint_source = MockDatapointSource {
@@ -281,7 +299,9 @@ mod tests {
         )
         .unwrap();
 
-        let _signed_tx = mock_node_api.sign_transaction(action.transaction_context).unwrap();
+        let _signed_tx = mock_node_api
+            .sign_transaction(action.transaction_context)
+            .unwrap();
     }
 
     #[test]
@@ -303,7 +323,10 @@ mod tests {
         .unwrap();
 
         let secret = force_any_val::<DlogProverInput>();
-        let oracle_address = NetworkAddress::new(NetworkPrefix::Mainnet, &Address::P2Pk(secret.public_image().clone()));
+        let oracle_address = NetworkAddress::new(
+            NetworkPrefix::Mainnet,
+            &Address::P2Pk(secret.public_image().clone()),
+        );
         let c: Constant = secret.public_image().into();
         let expr: Expr = c.into();
         let ergo_tree = ErgoTree::try_from(expr).unwrap();
@@ -347,7 +370,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
 
         let (action, _) = build_publish_first_datapoint_action(
@@ -363,11 +386,18 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            action.transaction_context.spending_tx.output_candidates.first().value,
+            action
+                .transaction_context
+                .spending_tx
+                .output_candidates
+                .first()
+                .value,
             oracle_contract_parameters.min_storage_rent
         );
 
-        let _signed_tx = mock_node_api.sign_transaction(action.transaction_context).unwrap();
+        let _signed_tx = mock_node_api
+            .sign_transaction(action.transaction_context)
+            .unwrap();
     }
 
     #[test]
@@ -382,7 +412,10 @@ mod tests {
         dbg!(&token_ids);
         dbg!(&minted_reward_token_id);
         let secret = force_any_val::<DlogProverInput>();
-        let oracle_address = NetworkAddress::new(NetworkPrefix::Mainnet, &Address::P2Pk(secret.public_image().clone()));
+        let oracle_address = NetworkAddress::new(
+            NetworkPrefix::Mainnet,
+            &Address::P2Pk(secret.public_image().clone()),
+        );
         let oracle_pub_key = secret.public_image().h;
 
         let oracle_box_wrapper_inputs =
@@ -426,7 +459,7 @@ mod tests {
             ctx: ctx.clone(),
             secrets: vec![secret.clone().into()],
             submitted_txs: &SubmitTxMock::default().transactions,
-            chain_submit_tx: None
+            chain_submit_tx: None,
         };
 
         let datapoint_source = MockDatapointSource {
@@ -444,6 +477,8 @@ mod tests {
         )
         .unwrap();
 
-        let _signed_tx = mock_node_api.sign_transaction(action.transaction_context).unwrap();
+        let _signed_tx = mock_node_api
+            .sign_transaction(action.transaction_context)
+            .unwrap();
     }
 }
