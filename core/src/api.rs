@@ -7,7 +7,7 @@ use crate::monitor::{
     check_oracle_health, check_pool_health, HealthStatus, OracleHealth, PoolHealth,
 };
 use crate::node_interface::node_api::{NodeApi, NodeApiError};
-use crate::oracle_config::{ORACLE_CONFIG, ORACLE_SECRETS};
+use crate::oracle_config::ORACLE_CONFIG;
 use crate::oracle_state::{DataSourceError, LocalDatapointState, OraclePool};
 use crate::pool_config::POOL_CONFIG;
 use axum::http::StatusCode;
@@ -129,8 +129,6 @@ async fn pool_status(oracle_pool: Arc<OraclePool>) -> Result<Json<serde_json::Va
 
 fn pool_status_sync(oracle_pool: Arc<OraclePool>) -> Result<Json<serde_json::Value>, ApiError> {
     let node_api = NodeApi::new(
-        ORACLE_SECRETS.node_api_key.clone(),
-        ORACLE_SECRETS.wallet_password.clone(),
         &ORACLE_CONFIG.node_url,
     );
     let current_height = node_api.node.current_block_height()? as u32;
@@ -161,8 +159,6 @@ fn pool_status_sync(oracle_pool: Arc<OraclePool>) -> Result<Json<serde_json::Val
 async fn block_height() -> Result<impl IntoResponse, ApiError> {
     let current_height = task::spawn_blocking(move || {
         let node_api = NodeApi::new(
-            ORACLE_SECRETS.node_api_key.clone(),
-            ORACLE_SECRETS.wallet_password.clone(),
             &ORACLE_CONFIG.node_url,
         );
         node_api.node.current_block_height()
@@ -206,8 +202,6 @@ async fn oracle_health(oracle_pool: Arc<OraclePool>) -> impl IntoResponse {
 
 fn oracle_health_sync(oracle_pool: Arc<OraclePool>) -> Result<OracleHealth, ApiError> {
     let node_api = NodeApi::new(
-        ORACLE_SECRETS.node_api_key.clone(),
-        ORACLE_SECRETS.wallet_password.clone(),
         &ORACLE_CONFIG.node_url,
     );
     let current_height = (node_api.node.current_block_height()? as u32).into();
@@ -252,14 +246,12 @@ async fn pool_health(oracle_pool: Arc<OraclePool>) -> impl IntoResponse {
 
 fn pool_health_sync(oracle_pool: Arc<OraclePool>) -> Result<PoolHealth, ApiError> {
     let node_api = NodeApi::new(
-        ORACLE_SECRETS.node_api_key.clone(),
-        ORACLE_SECRETS.wallet_password.clone(),
         &ORACLE_CONFIG.node_url,
     );
     let current_height = (node_api.node.current_block_height()? as u32).into();
     let pool_box = &oracle_pool.get_pool_box_source().get_pool_box()?;
     let pool_box_height = pool_box.get_box().creation_height.into();
-    let network_prefix = node_api.get_change_address()?.network();
+    let network_prefix = ORACLE_CONFIG.change_address.clone().unwrap().network();
     let pool_health = check_pool_health(
         current_height,
         pool_box_height,

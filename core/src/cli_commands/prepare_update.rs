@@ -30,6 +30,7 @@ use ergo_lib::{
         tx_builder::{TxBuilder, TxBuilderError},
     },
 };
+use ergo_lib::wallet::signing::{TransactionContext, TxSigningError};
 use ergo_node_interface::node_interface::NodeError;
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -53,8 +54,7 @@ use crate::{
     },
     explorer_api::wait_for_txs_confirmation,
     node_interface::{
-        node_api::{NodeApi, NodeApiError},
-        SignTransactionWithInputs, SubmitTransaction,
+        node_api::{NodeApi, NodeApiError}
     },
     oracle_config::{OracleConfig, BASE_FEE, ORACLE_CONFIG},
     oracle_state::{DataSourceError, OraclePool},
@@ -64,9 +64,8 @@ use crate::{
     spec_token::{
         BallotTokenId, OracleTokenId, RefreshTokenId, RewardTokenId, TokenIdKind, UpdateTokenId,
     },
-    wallet::{WalletDataError, WalletDataSource},
 };
-
+use crate::node_interface::node_api::NodeApiTrait;
 use super::bootstrap::{NftMintDetails, TokenMintDetails};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -94,12 +93,10 @@ pub fn prepare_update(
     let s = std::fs::read_to_string(config_file_name)?;
     let config_serde: UpdateBootstrapConfigSerde = serde_yaml::from_str(&s)?;
 
-    let change_address = node_api.get_change_address()?.address();
+    let change_address = ORACLE_CONFIG.change_address.clone().unwrap().address();
     let config = UpdateBootstrapConfig::try_from(config_serde)?;
     let update_bootstrap_input = PrepareUpdateInput {
-        wallet: node_api,
-        tx_signer: &node_api.node,
-        submit_tx: &node_api.node,
+        node_api,
         tx_fee: *BASE_FEE,
         erg_value_per_box: *BASE_FEE,
         change_address,
@@ -181,9 +178,7 @@ fn print_hints_for_voting(height: BlockHeight) -> Result<(), PrepareUpdateError>
 }
 
 struct PrepareUpdateInput<'a> {
-    pub wallet: &'a dyn WalletDataSource,
-    pub tx_signer: &'a dyn SignTransactionWithInputs,
-    pub submit_tx: &'a dyn SubmitTransaction,
+    pub node_api: &'a dyn NodeApiTrait,
     pub tx_fee: BoxValue,
     pub erg_value_per_box: BoxValue,
     pub change_address: Address,
@@ -260,7 +255,7 @@ impl<'a> PrepareUpdate<'a> {
         .build()?;
         output_candidates.push(remaining_funds.clone());
 
-        let inputs = box_selection.boxes.clone();
+        let inputs = box_selection.boxes.clone().to_vec();
         let tx_builder = TxBuilder::new(
             box_selection,
             output_candidates,
@@ -270,10 +265,14 @@ impl<'a> PrepareUpdate<'a> {
         );
         let mint_token_tx = tx_builder.build()?;
         debug!("Mint token unsigned transaction: {:?}", mint_token_tx);
+        let context = match TransactionContext::new(mint_token_tx, inputs, vec![]) {
+            Ok(ctx) => ctx,
+            Err(e) => return Err(PrepareUpdateError::TxSigningError(e)),
+        };
         let signed_tx =
             self.input
-                .tx_signer
-                .sign_transaction_with_inputs(&mint_token_tx, inputs, None)?;
+                .node_api
+                .sign_transaction(context)?;
         self.num_transactions_left -= 1;
         self.built_txs.push(signed_tx.clone());
         self.inputs_for_next_tx = self.filter_tx_outputs(signed_tx.outputs.clone());
@@ -306,19 +305,20 @@ impl<'a> PrepareUpdate<'a> {
         )
         .build()?;
         output_candidates.push(remaining_funds.clone());
+        let inputs = box_selection.boxes.clone().to_vec();
         let tx_builder = TxBuilder::new(
-            box_selection.clone(),
+            box_selection,
             output_candidates,
             self.input.height.0,
             self.input.tx_fee,
             self.input.change_address.clone(),
         );
         let refresh_box_tx = tx_builder.build()?;
-        let signed_refresh_box_tx = self.input.tx_signer.sign_transaction_with_inputs(
-            &refresh_box_tx,
-            box_selection.boxes.clone(),
-            None,
-        )?;
+        let context = match TransactionContext::new(refresh_box_tx, inputs, vec![]) {
+            Ok(ctx) => ctx,
+            Err(e) => return Err(PrepareUpdateError::TxSigningError(e)),
+        };
+        let signed_refresh_box_tx = self.input.node_api.sign_transaction(context)?;
         self.num_transactions_left -= 1;
         self.built_txs.push(signed_refresh_box_tx.clone());
         self.inputs_for_next_tx = self.filter_tx_outputs(signed_refresh_box_tx.outputs.clone());
@@ -343,10 +343,9 @@ impl<'a> PrepareUpdate<'a> {
         let mut need_pool_contract_update = false;
         let mut need_ballot_contract_update = false;
 
-        let unspent_boxes = self.input.wallet.get_unspent_wallet_boxes()?;
-        debug!("unspent boxes: {:?}", unspent_boxes);
         let target_balance = self.calc_target_balance(self.num_transactions_left)?;
         debug!("target_balance: {:?}", target_balance);
+        let unspent_boxes = self.input.node_api.get_unspent_boxes_by_address(&self.oracle_config.oracle_address.to_base58(), target_balance, [].into())?;
         let box_selector = SimpleBoxSelector::new();
         let box_selection = box_selector.select(unspent_boxes.clone(), target_balance, &[])?;
         debug!("box selection: {:?}", box_selection);
@@ -502,7 +501,7 @@ impl<'a> PrepareUpdate<'a> {
 
         let mut submitted_tx_ids = Vec::new();
         for tx in self.built_txs {
-            let _ = self.input.submit_tx.submit_transaction(&tx)?;
+            let _ = self.input.node_api.submit_transaction(&tx)?;
             submitted_tx_ids.push(tx.id());
         }
         Ok((new_pool_config, submitted_tx_ids))
@@ -539,6 +538,8 @@ pub enum PrepareUpdateError {
     UpdateContract(#[from] UpdateContractError),
     #[error("Pool contract failed: {0}")]
     PoolContract(#[from] PoolContractError),
+    #[error("tx signing error: {0}")]
+    TxSigningError(#[from] TxSigningError),
     #[error("Bootstrap config file already exists")]
     ConfigFilenameAlreadyExists,
     #[error("No parameters were added for update")]
@@ -547,8 +548,6 @@ pub enum PrepareUpdateError {
     NoMintDetails,
     #[error("Serde conversion error {0}")]
     SerdeConversion(#[from] SerdeConversionError),
-    #[error("WalletData error: {0}")]
-    WalletData(#[from] WalletDataError),
     #[error("Ballot contract error: {0}")]
     BallotContract(#[from] BallotContractError),
     #[error("Node API error: {0}")]
@@ -569,12 +568,13 @@ mod test {
         wallet::Wallet,
     };
     use sigma_test_util::force_any_val;
-
+    use url::Url;
     use super::*;
     use crate::{
         cli_commands::bootstrap::tests::SubmitTxMock,
-        pool_commands::test_utils::{LocalTxSigner, WalletDataMock},
+        pool_commands::test_utils::LocalTxSigner,
     };
+    use crate::node_interface::test_utils::MockNodeApi;
 
     #[test]
     fn test_prepare_update_transaction() {
@@ -626,7 +626,6 @@ rescan_height: 141887
         let old_oracle_config: OracleConfig = serde_yaml::from_str(
             r#"
 node_url: http://10.94.77.47:9052
-node_api_key: hello
 base_fee: 1100000
 scan_start_height: 0
 log_level: ~
@@ -649,7 +648,6 @@ data_point_source_custom_script: ~
             oracle_address: network_address.clone(),
             ..old_oracle_config
         };
-        let wallet = Wallet::from_secrets(vec![secret.clone().into()]);
         let ergo_tree = network_address.address().script().unwrap();
 
         let value = BASE_FEE.checked_mul_u32(10000).unwrap();
@@ -702,15 +700,13 @@ data_point_source_custom_script: ~
         let height = BlockHeight(ctx.pre_header.height);
         let submit_tx = SubmitTxMock::default();
         let prepare_update_input = PrepareUpdateInput {
-            wallet: &WalletDataMock {
+            node_api: &MockNodeApi {
                 unspent_boxes: unspent_boxes.clone(),
-                change_address: change_address.clone(),
+                ctx: ctx.clone(),
+                secrets: vec![secret.clone().into()],
+                submitted_txs: &submit_tx.transactions,
+                chain_submit_tx: None
             },
-            tx_signer: &mut LocalTxSigner {
-                ctx: &ctx,
-                wallet: &wallet,
-            },
-            submit_tx: &submit_tx,
             tx_fee: *BASE_FEE,
             erg_value_per_box: *BASE_FEE,
             change_address: change_address.address(),
