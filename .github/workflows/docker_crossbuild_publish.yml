@@ -83,7 +83,7 @@ jobs:
        id: metadata
        uses: docker/metadata-action@v5
        with:
-          images: ghcr.io/zargarzadehm/oracle-core
+         images: ghcr.io/zargarzadehm/oracle-core
          flavor: |
            latest=true
          
