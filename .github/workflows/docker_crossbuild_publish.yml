@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY_IMAGE: ergoplatform/oracle-core
+  REGISTRY_IMAGE: ghcr.io/zargarzadehm/oracle-core
 
 jobs:
  build:
@@ -30,13 +30,15 @@ jobs:
        id: metadata
        uses: docker/metadata-action@v5
        with:
-         images: ${{ env.REGISTRY_IMAGE }}
+          images: ghcr.io/zargarzadehm/oracle-core
            
      - name: Login to DockerHub
        uses: docker/login-action@v3
        with:
-         username: ${{ secrets.DOCKERHUB_USERNAME }}
-         password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: zargarzadehm
+          password: ${{ secrets.GITHUB_TOKEN }}
+
 
      - name: Build and push by digest
        id: build
@@ -45,7 +47,7 @@ jobs:
          context: .
          platforms: ${{ matrix.platform }}
          labels: ${{ steps.metadata.outputs.labels }}
-         outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+         outputs: type=image,name=ghcr.io/zargarzadehm/oracle-core,push-by-digest=true,name-canonical=true,push=true
          build-args: |
            TARGETPLATFORM=${{ matrix.platform }}
            CCARCH=${{ matrix.ccarch }}
@@ -81,21 +83,22 @@ jobs:
        id: metadata
        uses: docker/metadata-action@v5
        with:
-         images: ${{ env.REGISTRY_IMAGE }}
+          images: ghcr.io/zargarzadehm/oracle-core
          flavor: |
            latest=true
          
      - name: Login to DockerHub
        uses: docker/login-action@v3
        with:
-         username: ${{ secrets.DOCKERHUB_USERNAME }}
-         password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: zargarzadehm
+          password: ${{ secrets.GITHUB_TOKEN }}
 
      - name: Create manifest list and push
        working-directory: /tmp/digests
        run: |
          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-           $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+           $(printf 'ghcr.io/zargarzadehm/oracle-core@sha256:%s ' *)
      - name: Inspect image
        run: |
-         docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.metadata.outputs.version }}
+         docker buildx imagetools inspect ghcr.io/zargarzadehm/oracle-core:${{ steps.metadata.outputs.version }}
