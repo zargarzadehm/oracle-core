@@ -95,7 +95,11 @@ jobs:
        with:
          path: ${{ runner.temp }}/digests
          pattern: digests-*
-         # merge-multiple: true
+         merge-multiple: true
+
+     - name: check digests
+       run: |
+        ls -la ${{ runner.temp }}/digests
          
      - name: Set up Docker Buildx
        uses: docker/setup-buildx-action@v3
@@ -118,6 +122,7 @@ jobs:
      - name: Create manifest list and push
        working-directory: ${{ runner.temp }}/digests
        run: |
+          echo $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON")
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
 
