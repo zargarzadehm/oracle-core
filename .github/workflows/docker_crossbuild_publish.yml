@@ -26,6 +26,9 @@ jobs:
      - name: Checkout code
        uses: actions/checkout@v4
 
+     - name: Set up QEMU
+       uses: docker/setup-qemu-action@v3
+
      - name: Set up Docker Buildx
        uses: docker/setup-buildx-action@v3
 
@@ -47,15 +50,15 @@ jobs:
           username: zargarzadehm
           password: ${{ secrets.GITHUB_TOKEN }}
 
-
      - name: Build and push by digest
        id: build
        uses: docker/build-push-action@v6
        with:
          context: .
          platforms: ${{ matrix.platform }}
+         tags: ${{ env.REGISTRY_IMAGE }}
          labels: ${{ steps.metadata.outputs.labels }}
-         outputs: type=image,name=ghcr.io/zargarzadehm/oracle-core,push-by-digest=true,name-canonical=true,push=true
+         outputs: type=image,push-by-digest=true,name-canonical=true,push=true
          build-args: |
            TARGETPLATFORM=${{ matrix.platform }}
            CCARCH=${{ matrix.ccarch }}
@@ -78,6 +81,10 @@ jobs:
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
+
+     - name: check digests
+       run: |
+          ls -la ${{ runner.temp }}/digests/
           
  merge:
    needs: build
@@ -97,7 +104,7 @@ jobs:
        id: metadata
        uses: docker/metadata-action@v5
        with:
-         images: ghcr.io/zargarzadehm/oracle-core
+         images: ${{ env.REGISTRY_IMAGE }}
          flavor: |
            latest=true
          
@@ -116,7 +123,7 @@ jobs:
 
      - name: Inspect image
        run: |
-         docker buildx imagetools inspect ghcr.io/zargarzadehm/oracle-core:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
      # - name: Create manifest list and push
      #   working-directory: /tmp/digests
