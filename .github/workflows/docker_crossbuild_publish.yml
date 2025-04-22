@@ -95,7 +95,7 @@ jobs:
        with:
          path: ${{ runner.temp }}/digests
          pattern: digests-*
-         merge-multiple: true
+        #  merge-multiple: true
      - name: check digests
        run: |
         ls -la ${{ runner.temp }}/digests
